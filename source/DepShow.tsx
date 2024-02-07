@@ -40,34 +40,30 @@ export const showDepGraph = async (path: string, packageName: string) => {
     roots.delete(target || '');
   }
 
+	const inPath = new Set<string>;
+
+	const dfs = (currNode: string, rootNode: string) => {
+		if (inPath.has(currNode)) return;
+
+		inPath.add(currNode);
+
+		rootsOfNode[currNode]?.add(rootNode);
+
+		for (const neighbour of graph.get(currNode) || []) {
+			dfs(neighbour, rootNode);
+		}
+
+		inPath.delete(currNode);
+	}
+
 	for (const node of nodes) {
 		rootsOfNode[node] = new Set<string>;
 	}
 
-	const bfsQueue: string[] = [];
-
 	for (const root of roots) {
-		rootsOfNode[root]?.add(root);
-		bfsQueue.push(root);
+		dfs(root, root);
 	}
-
-	const visited = new Set;
-
-	while(bfsQueue.length) {
-		const topNode = bfsQueue.shift() || '';
-		if (visited.has(topNode)) {
-			continue;
-		}
-		visited.add(topNode);
-		const neightbours = graph.get(topNode) || [];
-		neightbours.forEach(neightbour => {
-			for (const r of rootsOfNode?.[topNode] || []) {
-				rootsOfNode[neightbour]?.add(r);
-			}
-			bfsQueue.push(neightbour);
-		});
-	}
-  	
+	
 	nodes.forEach(node => {
 		return node?.includes(packageName) && console.log(node, rootsOfNode[node]);
 	});
