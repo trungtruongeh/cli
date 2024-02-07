@@ -11,7 +11,7 @@ $ npm install --global ink-cli
 ## CLI
 
 ```
-$ ink-cli --help
+$ mycli --help
 
   Usage
     $ ink-cli
