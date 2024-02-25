@@ -1,27 +1,51 @@
 // @ts-ignore
 import parseYarnLock from 'parse-yarn-lock';
-import fs from 'fs';
 
-export const showDepGraph = async (path: string, packageName: string) => {
-	const lockfile = fs.readFileSync(path).toString()
+export const showDepGraph = async (repo: string, packageName: string) => {
+	const lockfile = await fetch(
+		`https://raw.githubusercontent.com/Thinkei/${repo}/master/yarn.lock`,
+		{
+			method: 'GET',
+			headers: {
+				'Authorization': `Bearer ${process.env['GITHUB_TOKEN'] as string}`
+			}
+		}
+	)
+	.then(async res => {
+		if (res.status !== 200) {
+			console.log(await res.text());
+				return null;
+		}
+
+		return res.text();
+	})
+	.catch(() => {
+		return null;
+	});
+
+	if (!lockfile) {
+		console.log('Repo or package name is invalid');
+		return;
+	}
+
 	const lock = parseYarnLock.default(lockfile) as { object: Record<string, any>, type: Record<string, any> };
 
-  const nodes = new Set<string>;
-  const edges = [];
+	const nodes = new Set<string>;
+	const edges = [];
 	const graph = new Map<string, string[]>;
-  const edgeSet = new Set;
+	const edgeSet = new Set;
 
-  for (const [key, value] of Object.entries(lock.object)) {
-    const name = key.substring(0, key.indexOf("@", 1));
-    const source = `${name}@${value.version}`;
-    nodes.add(source);
-    for (const [depkey, depvalue] of Object.entries({...value.optionalDependencies, ...value.dependencies})) {
-      const targetKey = `${depkey}@${depvalue}`;
-      const targetObject = lock.object[targetKey];
-      const target = targetObject ? `${depkey}@${targetObject.version}` : targetKey;
+	for (const [key, value] of Object.entries(lock.object)) {
+		const name = key.substring(0, key.indexOf("@", 1));
+		const source = `${name}@${value.version}`;
+		nodes.add(source);
+		for (const [depkey, depvalue] of Object.entries({ ...value.optionalDependencies, ...value.dependencies })) {
+			const targetKey = `${depkey}@${depvalue}`;
+			const targetObject = lock.object[targetKey];
+			const target = targetObject ? `${depkey}@${targetObject.version}` : targetKey;
 
-      const edgeKey = `${source} ========= ${target}`
-      if (!edgeSet.has(edgeKey)) {
+			const edgeKey = `${source} ========= ${target}`
+			if (!edgeSet.has(edgeKey)) {
 				edgeSet.add(edgeKey);
 				edges.push([source, target]);
 				const edgeSource = graph.get(source as string) || [];
@@ -30,15 +54,15 @@ export const showDepGraph = async (path: string, packageName: string) => {
 				}
 				graph.set(source, edgeSource);
 			}
-    }
-  }
+		}
+	}
 
-  const roots = new Set(nodes);
+	const roots = new Set(nodes);
 	const rootsOfNode: Record<string, Set<string>> = {};
 
-  for (const [_, target] of edges) {
-    roots.delete(target || '');
-  }
+	for (const [_, target] of edges) {
+		roots.delete(target || '');
+	}
 
 	const inPath = new Set<string>;
 
@@ -63,8 +87,8 @@ export const showDepGraph = async (path: string, packageName: string) => {
 	for (const root of roots) {
 		dfs(root, root);
 	}
-	
+
 	nodes.forEach(node => {
-		return node?.includes(packageName) && console.log(node, rootsOfNode[node]);
+		return node.split('@')[0] === packageName && console.log(node, rootsOfNode[node]);
 	});
 };

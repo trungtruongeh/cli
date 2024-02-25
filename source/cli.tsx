@@ -26,17 +26,17 @@ tokenCommandGroup.command('generate-uuid')
 	});
 
 const depCommandGroup = program
-	.command('dep')
-	.alias('d')
+	.command('dependency')
+	.alias('dep')
 	.description('dependency between npm packages');
 
-depCommandGroup.command('show')
-	.alias('s')
+depCommandGroup.command('root')
+	.alias('rt')
 	.description('show root package')
-	.argument('<file_path>', 'path to yarn.lock file')
+	.argument('<repo>', 'repository')
 	.argument('<name>', 'name of package to trace')
-	.action((file_path, name) => {
-		showDepGraph(file_path, name);
+	.action((repo, name) => {
+		showDepGraph(repo, name);
 	});
 
 program.parse();
