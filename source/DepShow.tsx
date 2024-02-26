@@ -1,6 +1,8 @@
 // @ts-ignore
 import parseYarnLock from 'parse-yarn-lock';
 
+const getPackageName = (packageWithVersion: string) => packageWithVersion.split('@').slice(0, -1).join('@')
+
 export const showDepGraph = async (repo: string, packageName: string) => {
 	const lockfile = await fetch(
 		`https://raw.githubusercontent.com/Thinkei/${repo}/master/yarn.lock`,
@@ -11,22 +13,45 @@ export const showDepGraph = async (repo: string, packageName: string) => {
 			}
 		}
 	)
-	.then(async res => {
-		if (res.status !== 200) {
-			console.log(await res.text());
+		.then(async res => {
+			if (res.status !== 200) {
+				console.log(await res.text());
 				return null;
-		}
+			}
 
-		return res.text();
-	})
-	.catch(() => {
-		return null;
-	});
+			return res.text();
+		})
+		.catch(() => {
+			return null;
+		});
 
 	if (!lockfile) {
 		console.log('Repo or package name is invalid');
 		return;
 	}
+
+	const packageFile = await fetch(
+		`https://raw.githubusercontent.com/Thinkei/${repo}/master/package.json`,
+		{
+			method: 'GET',
+			headers: {
+				'Authorization': `Bearer ${process.env['GITHUB_TOKEN'] as string}`
+			}
+		}
+	)
+		.then(async res => {
+			if (res.status !== 200) {
+				console.log(await res.text());
+				return null;
+			}
+
+			return res.json();
+		})
+		.catch(() => {
+			return null;
+		});
+
+	const devDeps = packageFile.devDependencies;
 
 	const lock = parseYarnLock.default(lockfile) as { object: Record<string, any>, type: Record<string, any> };
 
@@ -89,6 +114,25 @@ export const showDepGraph = async (repo: string, packageName: string) => {
 	}
 
 	nodes.forEach(node => {
-		return node.split('@')[0] === packageName && console.log(node, rootsOfNode[node]);
+		if (getPackageName(node) === packageName) {
+			const rootDeps = Array.from(rootsOfNode[node]?.values() || '')
+				.filter((dep) => {
+					const depName = getPackageName(dep);
+					const rootVer = devDeps[depName];
+
+					if (rootVer) {
+						return false;
+					}
+
+					return dep;
+				});
+
+			console.log(
+				'\nVersion:', node,
+				'\nRoot dependencies:', Array.from(rootsOfNode[node]?.values() || ''),
+				'\nRoot dependencies (Without devs):', rootDeps,
+				'\n\n================================================================',
+			);
+		}
 	});
 };
